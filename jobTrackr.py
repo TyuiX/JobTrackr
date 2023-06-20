@@ -1,5 +1,6 @@
 import getopt
 import sys, os, datetime
+from openpyxl import Workbook
 arguments = sys.argv
 filename = None
 
@@ -10,17 +11,17 @@ FLAG_L = 4
 FLAG_B = 8
 FLAG_AF = 16
 FLAG_G = 32
-
+FLAG_R = 64
 
 # Initialize the flags
 flags = 0
 
 #parse and handle the arguments
-
+filePointer = None 
 def parser(argv):
-    short_options = 'm:a:u:n:p:s:d:i:l:b:af:g:'
+    short_options = 'm:a:u:n:p:s:d:i:l:b:af:g:r:'
     long_options = ['make=', 'add=', 'update=', 'name=', 'position=', 'status=',
-                    'date=', 'id=', 'list', 'before=', 'after=', 'ghosted=']
+                    'date=', 'id=', 'list', 'before=', 'after=', 'ghosted=', 'remove=']
     
     #initalize stored value
     argv = sys.argv
@@ -113,23 +114,40 @@ def parser(argv):
 
 #create new file
 def make(filename):
+    if not filename.endswith('.xlsx'):
+        filename += '.xlsx'
+
     if not os.path.exists(filename):
         try:
             # Open the file in write mode
-            file = open(filename, 'w')
-            file.close()
+            workbook = Workbook()
+
+            # Save the workbook
+            workbook.save(filename)
             print("File created successfully!")
+            return 0
 
         except IOError:
             print("An error occurred while creating the file.")
+            return -1
     else:
         print("File already exists. No action taken.")
+        return -1
 
 def openFile(filename):
-    pass
+    global filePointer
+    if os.path.exists(filename):
+        filePointer = open(filename, 'r')
+    else:
+        print("file does not exist")
+
+    
 
 def add(name, position, status,  current_year, current_month, current_day):
-    pass
+    if not (name and position):
+        raise SyntaxError
+    
+    
 
 def update(args):
     pass
