@@ -1,8 +1,9 @@
 import getopt
+import pandas as pd
 import sys, os, datetime
 from openpyxl import Workbook
 arguments = sys.argv
-filename = None
+
 
 # Define the flags as powers of 2 for bitmasking 
 FLAG_A = 1  
@@ -11,17 +12,14 @@ FLAG_L = 4
 FLAG_B = 8
 FLAG_AF = 16
 FLAG_G = 32
-FLAG_R = 64
 
 # Initialize the flags
 flags = 0
 
-#parse and handle the arguments
-filePointer = None 
 def parser(argv):
-    short_options = 'm:a:u:n:p:s:d:i:l:b:af:g:r:'
+    short_options = 'm:a:u:n:p:s:d:i:l:b:af:g:'
     long_options = ['make=', 'add=', 'update=', 'name=', 'position=', 'status=',
-                    'date=', 'id=', 'list', 'before=', 'after=', 'ghosted=', 'remove=']
+                    'date=', 'id=', 'list', 'before=', 'after=', 'ghosted=']
     
     #initalize stored value
     argv = sys.argv
@@ -37,7 +35,6 @@ def parser(argv):
     current_year = current_datetime.strftime("%Y")  # 4-digit year
     current_month = current_datetime.strftime("%B")  # Full month name
     current_day = current_datetime.strftime("%d")
-    file = sys.argv[-1]
 
     try:
         # Parse the command-line arguments
@@ -49,6 +46,7 @@ def parser(argv):
     for opt, arg in opts:
         if opt in ('-m', '--make'):
             make(argv[-1])
+            argv[-1] += '.csv'
         elif opt in ('-a', '--add'):
             flags += FLAG_A
         elif opt in ('-u', '--update'):
@@ -94,16 +92,18 @@ def parser(argv):
             raise SyntaxError
     
     #process
-
+    dataframe=  pd.read_csv(argv[-1])
     if flags & FLAG_A:
         #see if there other flag that dosent belong with add flag
         if flags & 62:
             raise SyntaxError
-        add(name, position, status,  current_year, current_month, current_day)
+        add(name, position, status,  current_year, current_month, current_day, dataframe)
+        dataframe.to_csv(argv[-1], index=False)
     elif flags & FLAG_U:
         if flags & 61:
             raise SyntaxError
-        update(id, name, position, status,  current_year, current_month, current_day)
+        update(id, name, position, status,  current_year, current_month, current_day, dataframe)
+        dataframe.to_csv(argv[-1], index=False)
     elif flags & FLAG_L:
         if flags & 61:
             raise SyntaxError
@@ -114,19 +114,15 @@ def parser(argv):
 
 #create new file
 def make(filename):
-    if not filename.endswith('.xlsx'):
-        filename += '.xlsx'
+    if not filename.endswith('.csv'):
+        filename += '.csv'
 
     if not os.path.exists(filename):
         try:
-            # Open the file in write mode
-            workbook = Workbook()
-
-            # Save the workbook
-            workbook.save(filename)
+            with open(filename, 'w') as file:
+                file.write('company, position, status, date\n')  # Add column headers
             print("File created successfully!")
             return 0
-
         except IOError:
             print("An error occurred while creating the file.")
             return -1
@@ -143,18 +139,45 @@ def openFile(filename):
 
     
 
-def add(name, position, status,  current_year, current_month, current_day):
+def add(name, position, status,  current_year, current_month, current_day, dataframe):
     if not (name and position):
         raise SyntaxError
-    
+    date = unparseDate(current_year, current_month, current_day)
+    data = {'company': name, 'position': position, 'status': status , 'date': date}
+    dataframe = dataframe.append(data, ignore_index=True)
+    return 0
+        
     
 
-def update(args):
-    pass
+def update(id, name, position, status,  current_year, current_month, current_day, dataframe):
+    if id != None:
+        dataframe[id, 'status'] = status
+    else:
+        query = (dataframe['name'] == name) & (dataframe['position'] == position)
+        dataframe.loc[query, 'status'] = status
 
 def list(options):
     pass
 
 #return array as year month day
 def parseDate(date):
-    pass
+    # Extract the month, day, and year using string slicing
+    month = int(date[1:3])
+    day = int(date[4:6])
+    year = int(date [7:])
+    if  not (1 <= month <= 12):
+        return None
+    elif  not (1 <= date <= 31):
+        return None
+    return [year, month, day]   
+
+#return an unparsed string formatted as mxxdxxyxxxx
+def unparseDate(current_year, current_month, current_day):
+    year_str = str(current_year)
+    month_str = str(current_month)
+    day_str = str(current_day)
+    month_str = month_str.zfill(2)
+    day_str = day_str.zfill(2)
+    formatted_date = 'm{}d{}y{}'.format(month_str, day_str, year_str)
+
+    return formatted_date
